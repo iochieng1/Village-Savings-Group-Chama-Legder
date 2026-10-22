@@ -201,7 +201,7 @@ def require_official(member: Member, group_id: int) -> None:
         raise PermissionDenied("only an active official of this group can do this")
 
 
-def _require_approver(recorder: Member, approver: Member | None, group_id: int) -> None:
+def require_approver(recorder: Member, approver: Member | None, group_id: int) -> None:
     if approver is None:
         raise PermissionDenied("a second official must approve this")
     require_official(approver, group_id)
@@ -232,7 +232,7 @@ def _append(
 ) -> Entry:
     require_official(recorded_by, group_id)
     if kind in MONEY_OUT or kind is Kind.REVERSAL:
-        _require_approver(recorded_by, approved_by, group_id)
+        require_approver(recorded_by, approved_by, group_id)
     if kind in MEMBER_KINDS:
         if member_id is None:
             raise ChamaError(f"{kind} must be for a member")
