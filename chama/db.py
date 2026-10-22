@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS checkpoints (
     hash       TEXT NOT NULL,
     closed_at  TEXT NOT NULL,
     closed_by  INTEGER NOT NULL REFERENCES members(id),
+    expected_cash INTEGER NOT NULL,
+    counted_cash  INTEGER,
     note       TEXT NOT NULL DEFAULT ''
 );
 

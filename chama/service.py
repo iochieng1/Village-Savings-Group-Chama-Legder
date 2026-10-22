@@ -146,7 +146,7 @@ def add_member(
     role: str = "member",
     language: str = "en",
 ) -> Member:
-    _require_official(by, group_id)
+    require_official(by, group_id)
     if role not in ROLES:
         raise ChamaError(f"unknown role {role!r}")
     if role in OFFICIAL_ROLES and by.role != "chair":
@@ -196,7 +196,7 @@ def reset_pin(conn: sqlite3.Connection, group_id: int, by: Member, member_id: in
 # Ledger operations
 
 
-def _require_official(member: Member, group_id: int) -> None:
+def require_official(member: Member, group_id: int) -> None:
     if member.group_id != group_id or not member.active or not member.is_official:
         raise PermissionDenied("only an active official of this group can do this")
 
@@ -204,7 +204,7 @@ def _require_official(member: Member, group_id: int) -> None:
 def _require_approver(recorder: Member, approver: Member | None, group_id: int) -> None:
     if approver is None:
         raise PermissionDenied("a second official must approve this")
-    _require_official(approver, group_id)
+    require_official(approver, group_id)
     if approver.id == recorder.id:
         raise PermissionDenied("the approving official must be a different person")
 
@@ -230,7 +230,7 @@ def _append(
     now: datetime | None = None,
     check: Callable[[GroupState, list[Entry]], dict | None] | None = None,
 ) -> Entry:
-    _require_official(recorded_by, group_id)
+    require_official(recorded_by, group_id)
     if kind in MONEY_OUT or kind is Kind.REVERSAL:
         _require_approver(recorded_by, approved_by, group_id)
     if kind in MEMBER_KINDS:
