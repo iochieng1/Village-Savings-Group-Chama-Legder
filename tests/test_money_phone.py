@@ -17,6 +17,13 @@ def test_parse_rejects(raw):
         money.parse(raw)
 
 
+def test_parse_allow_zero():
+    assert money.parse("0", allow_zero=True) == 0
+    assert money.parse(0, allow_zero=True) == 0
+    with pytest.raises(money.InvalidAmount):
+        money.parse("-1", allow_zero=True)
+
+
 def test_fmt():
     assert money.fmt(150000) == "KES 1,500"
     assert money.fmt(25050) == "KES 250.50"

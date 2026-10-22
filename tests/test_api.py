@@ -48,7 +48,7 @@ CHAIR_APPROVAL = {"approver_phone": "0700000001", "approver_pin": "4826"}
 
 def test_health_and_index(api):
     assert api.client.get("/health").json()["status"] == "ok"
-    assert api.client.get("/").status_code == 200
+    assert "Chama Ledger" in api.client.get("/").text
 
 
 def test_auth_required_and_scoped(api):
@@ -134,12 +134,14 @@ def test_overview_meeting_verify_export(api, gateway):
     assert meeting.json()["cash_difference"] == -10000
     assert "ZIMEPUNGUA" in dict(gateway.outbox)["+254700000003"]
     assert api.client.post(f"/groups/{api.gid}/meetings/close", headers=api.alice, json={}).status_code == 403
+    empty_box = api.client.post(f"/groups/{api.gid}/meetings/close", headers=api.treasurer, json={"counted_cash": "0"})
+    assert empty_box.json()["cash_difference"] == -100000
 
     overview = api.client.get(f"/groups/{api.gid}", headers=api.alice).json()
     assert overview["verification"]["ok"] is True
-    assert overview["verification"]["checkpoints_matched"] == 1
+    assert overview["verification"]["checkpoints_matched"] == 2
     assert overview["summary"]["total_savings"] == 100000
-    assert len(api.client.get(f"/groups/{api.gid}/meetings", headers=api.alice).json()) == 1
+    assert len(api.client.get(f"/groups/{api.gid}/meetings", headers=api.alice).json()) == 2
     assert api.client.get(f"/groups/{api.gid}/verify", headers=api.alice).json()["ok"]
     assert len(api.client.get(f"/groups/{api.gid}/export", headers=api.alice).json()["entries"]) == 1
 

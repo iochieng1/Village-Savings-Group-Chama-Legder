@@ -304,7 +304,7 @@ def create_app(database: str | None = None, gateway: SmsGateway | None = None) -
     # Meetings and share-out
     @app.post("/groups/{group_id}/meetings/close", status_code=201)
     def close_meeting(group_id: int, body: CloseMeeting, me: Me, conn: Conn):
-        counted = money.parse(body.counted_cash) if body.counted_cash not in (None, "") else None
+        counted = money.parse(body.counted_cash, allow_zero=True) if body.counted_cash not in (None, "") else None
         result = meetings.close_meeting(conn, group_id, me, sms, counted, body.note)
         return {**asdict(result), "cash_difference": result.cash_difference}
 

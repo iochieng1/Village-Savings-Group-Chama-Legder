@@ -13,10 +13,14 @@ class InvalidAmount(ValueError):
     pass
 
 
-def parse(raw: str | int) -> int:
-    """Parse a positive shilling amount such as "1,500" or "250.50" into cents."""
+def parse(raw: str | int, allow_zero: bool = False) -> int:
+    """Parse a shilling amount such as "1,500" or "250.50" into cents.
+
+    Amounts must be positive unless ``allow_zero`` is set (e.g. a cash count).
+    """
+    minimum = 0 if allow_zero else 1
     if isinstance(raw, int):
-        if raw <= 0:
+        if raw * 100 < minimum:
             raise InvalidAmount("amount must be positive")
         return raw * 100
     text = str(raw).strip().upper().removeprefix(CURRENCY).strip()
@@ -26,7 +30,7 @@ def parse(raw: str | int) -> int:
         cents = int(Decimal(text.replace(",", "")) * 100)
     except InvalidOperation as exc:
         raise InvalidAmount(f"not a valid amount: {raw!r}") from exc
-    if cents <= 0:
+    if cents < minimum:
         raise InvalidAmount("amount must be positive")
     return cents
 
