@@ -73,6 +73,12 @@ CREATE TABLE IF NOT EXISTS checkpoints (
     note       TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash  TEXT PRIMARY KEY,
+    member_id   INTEGER NOT NULL REFERENCES members(id),
+    expires_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS acknowledgements (
     id         INTEGER PRIMARY KEY,
     entry_id   INTEGER NOT NULL REFERENCES entries(id),
