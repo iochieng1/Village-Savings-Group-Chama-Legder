@@ -77,3 +77,15 @@ def test_cli_export_and_verify(c, tmp_path, capsys):
     assert cli.main(["verify", str(tmp_path / "missing.json")]) == 2
     with pytest.raises(SystemExit):
         cli.main(["verify", str(out), "--fingerprint", "ABCD-EF01"])
+
+
+def test_demo_seed_is_consistent(tmp_path, capsys):
+    path = str(tmp_path / "demo.db")
+    assert cli.main(["demo", "--database", path]) == 0
+    assert "PIN 7193" in capsys.readouterr().out
+    conn = db.connect(path)
+    check = meetings.verify_group(conn, 1)
+    assert check.ok and check.checkpoints_matched == 3
+    state = service.group_state(conn, 1)
+    assert state.loans_outstanding == 4000 * 100 + 1200 * 100 - 3000 * 100
+    assert state.reversed

@@ -2,6 +2,7 @@
 
 export  write a group's ledger to JSON
 verify  check an exported ledger, optionally against a fingerprint from your SMS
+demo    create a sample group to try the app
 """
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ import json
 import os
 import sys
 
-from . import db, money
+from . import db, demo, money
 from .export import InvalidExport, export_group, verify_export
 
 
@@ -29,7 +30,17 @@ def main(argv: list[str] | None = None) -> int:
     ver.add_argument("--fingerprint", help="fingerprint from your meeting SMS, e.g. 1A2B-3C4D")
     ver.add_argument("--at", type=int, help="entry number given in the same SMS")
 
+    dem = sub.add_parser("demo", help="create a sample group with three months of activity")
+    dem.add_argument("--database", default=os.getenv("CHAMA_DATABASE", "chama.db"))
+
     args = parser.parse_args(argv)
+
+    if args.command == "demo":
+        group_id = demo.seed(db.connect(args.database))
+        print(f"Demo group #{group_id} created in {args.database}. Log in with group number {group_id} and:")
+        for name, phone, pin, role, _ in demo.MEMBERS:
+            print(f"  {name:<16} {role:<10} phone {phone}  PIN {pin}")
+        return 0
 
     if args.command == "export":
         data = json.dumps(export_group(db.connect(args.database), args.group), indent=2, ensure_ascii=False)
