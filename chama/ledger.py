@@ -116,10 +116,9 @@ class Verification:
 
 
 def verify(entries: Iterable[Entry], checkpoints: Iterable[Checkpoint] = ()) -> Verification:
-    """Recompute the chain and compare it with published checkpoints."""
-    by_seq = {c.seq: c for c in checkpoints}
+    """Recompute the chain and compare it with every published checkpoint."""
     prev_hash, expected_seq, count = GENESIS_HASH, 1, 0
-    hashes: dict[int, str] = {}
+    hashes: dict[int, str] = {0: GENESIS_HASH}
 
     def fail(seq: int, reason: str) -> Verification:
         return Verification(False, count, expected_seq - 1, prev_hash, broken_at=seq, reason=reason)
@@ -134,16 +133,14 @@ def verify(entries: Iterable[Entry], checkpoints: Iterable[Checkpoint] = ()) -> 
         hashes[entry.seq] = entry.hash
         prev_hash, expected_seq, count = entry.hash, expected_seq + 1, count + 1
 
+    # Every checkpoint is checked, including several at the same entry
+    # (meetings with nothing recorded in between).
     matched = 0
-    for seq in sorted(by_seq):
-        checkpoint = by_seq[seq]
-        if seq not in hashes:
-            if seq == 0 and checkpoint.hash == GENESIS_HASH:
-                matched += 1
-                continue
-            return fail(seq, f"meeting fingerprint for entry #{seq} refers to an entry that no longer exists")
-        if hashes[seq] != checkpoint.hash:
-            return fail(seq, f"does not match the fingerprint {fingerprint(checkpoint.hash)} sent to members")
+    for checkpoint in sorted(checkpoints, key=lambda c: c.seq):
+        if checkpoint.seq not in hashes:
+            return fail(checkpoint.seq, f"meeting fingerprint for entry #{checkpoint.seq} refers to an entry that no longer exists")
+        if hashes[checkpoint.seq] != checkpoint.hash:
+            return fail(checkpoint.seq, f"does not match the fingerprint {fingerprint(checkpoint.hash)} sent to members")
         matched += 1
 
     return Verification(True, count, expected_seq - 1, prev_hash, checkpoints_matched=matched)

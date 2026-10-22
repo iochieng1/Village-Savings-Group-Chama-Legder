@@ -106,3 +106,13 @@ def test_truncated_ledger_caught_by_checkpoint():
     result = verify(chain[:2], [Checkpoint(4, chain[3].hash)])
     assert not result.ok
     assert "no longer exists" in result.reason
+
+
+def test_every_checkpoint_is_checked_even_at_the_same_entry():
+    chain = build_chain()
+    genuine = Checkpoint(2, chain[1].hash)
+    assert verify(chain, [genuine, Checkpoint(2, chain[1].hash)]).checkpoints_matched == 2
+    forged = Checkpoint(2, "f" * 64)
+    for order in ([genuine, forged], [forged, genuine]):
+        result = verify(chain, order)
+        assert not result.ok and result.broken_at == 2
