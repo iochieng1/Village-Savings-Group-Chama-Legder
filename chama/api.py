@@ -14,16 +14,17 @@ from dataclasses import asdict
 from datetime import date
 from importlib import resources
 from typing import Annotated, Literal
+from urllib.parse import parse_qs
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
-from . import __version__, acknowledgements, db, meetings, money, service, sessions, share_out
+from . import __version__, acknowledgements, db, meetings, money, service, sessions, share_out, ussd
 from .export import export_group
 from .i18n import t
 from .ledger import Kind, fingerprint
-from .phone import InvalidPhone, mask
+from .phone import InvalidPhone, mask, normalise
 from .security import WeakPin
 from .service import AuthError, ChamaError, Member, PermissionDenied
 from .sms import SmsGateway, from_env
@@ -320,5 +321,15 @@ def create_app(database: str | None = None, gateway: SmsGateway | None = None) -
     def share_out_execute(group_id: int, body: Approval, me: Me, conn: Conn):
         entries = share_out.execute(conn, group_id, me, _approver(conn, group_id, body))
         return {"entries": [e.seq for e in entries]}
+
+    # USSD callback (Africa's Talking posts application/x-www-form-urlencoded)
+    @app.post("/ussd", response_class=PlainTextResponse)
+    async def ussd_callback(request: Request, conn: Conn):
+        form = {k: v[0] for k, v in parse_qs((await request.body()).decode()).items()}
+        try:
+            phone = normalise(form.get("phoneNumber", ""))
+        except InvalidPhone:
+            return ussd.end(t("ussd.not_member"))
+        return ussd.handle(conn, phone, form.get("text", ""))
 
     return app

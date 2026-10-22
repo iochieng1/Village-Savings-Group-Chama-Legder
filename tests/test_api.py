@@ -168,3 +168,12 @@ def test_logout_and_pin_reset(api):
     assert api.client.post(f"/groups/{api.gid}/members/{api.alice_id}/reset-pin", headers=api.chair, json={"new_pin": "1111"}).status_code == 422
     assert api.client.post(f"/groups/{api.gid}/members/{api.alice_id}/reset-pin", headers=api.chair, json={"new_pin": "8642"}).status_code == 204
     login(api.client, api.gid, "0700000003", "8642")
+
+
+def test_ussd_callback(api):
+    form = {"sessionId": "s1", "serviceCode": "*384#", "phoneNumber": "+254700000003", "text": ""}
+    resp = api.client.post("/ussd", data=form)
+    assert resp.headers["content-type"].startswith("text/plain")
+    assert resp.text == "CON Umoja\nWeka PIN yako:"
+    form["phoneNumber"] = "bad"
+    assert api.client.post("/ussd", data=form).text.startswith("END")
