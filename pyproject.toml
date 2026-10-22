@@ -1,0 +1,18 @@
+[project]
+name = "chama-ledger"
+version = "0.1.0"
+description = "Tamper-evident ledger for village savings groups (chamas): contributions, loans and statements every member can verify."
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115", "uvicorn>=0.32"]
+
+[project.optional-dependencies]
+dev = ["httpx>=0.28", "pytest>=8.3"]
+
+[tool.setuptools.packages.find]
+include = ["chama*"]
+
+[tool.setuptools.package-data]
+chama = ["static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
