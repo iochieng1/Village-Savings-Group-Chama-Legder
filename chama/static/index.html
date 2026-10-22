@@ -1,1 +1,476 @@
-<!doctype html><title>Chama Ledger</title><p>Chama Ledger API. See <a href="docs">/docs</a>.</p>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chama Ledger</title>
+<style>
+  :root { --bg: #f5f6f2; --card: #fff; --ink: #1c2420; --muted: #5d6b64; --accent: #0b6e4f; --bad: #b3261e; --warn: #9a6200; --line: #dde3dd; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111714; --card: #1a221e; --ink: #e6eee9; --muted: #9fb0a7; --accent: #4cc596; --bad: #ff8a80; --warn: #f2c14e; --line: #2b3631; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  main { max-width: 860px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.3rem; margin: 4px 0; }
+  h2 { font-size: 1.1rem; margin: 0 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 12px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .stat b { display: block; font-size: 1.15rem; }
+  .muted { color: var(--muted); font-size: .9em; }
+  label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  input, select, button { font: inherit; padding: 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); width: 100%; }
+  button { background: var(--accent); color: #fff; border: 0; cursor: pointer; margin-top: 12px; }
+  button.link { background: none; color: var(--accent); width: auto; padding: 4px 8px; margin: 0; border: 1px solid var(--line); }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  nav button { width: auto; margin: 0; background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+  nav button.active { background: var(--accent); color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: .92em; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+  .ok { color: var(--accent); font-weight: 700; }
+  .bad { color: var(--bad); font-weight: 700; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .struck { text-decoration: line-through; color: var(--muted); }
+  code { font-family: ui-monospace, monospace; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+  [hidden] { display: none !important; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: 16px; max-width: 600px; margin: 0 auto; padding: 12px; border-radius: 8px; background: var(--ink); color: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Chama Ledger</h1>
+  <p class="muted">Every shilling recorded, every record verifiable by every member.</p>
+
+  <section id="auth">
+    <div class="card">
+      <h2>Log in</h2>
+      <form id="login-form">
+        <div class="row">
+          <div><label for="login-group">Group number</label><input id="login-group" type="number" min="1" required></div>
+          <div><label for="login-phone">Phone</label><input id="login-phone" type="tel" placeholder="07XX XXX XXX" required></div>
+        </div>
+        <label for="login-pin">PIN</label><input id="login-pin" type="password" inputmode="numeric" required>
+        <button type="submit">Log in</button>
+      </form>
+    </div>
+    <details class="card">
+      <summary><b>Start a new group</b></summary>
+      <form id="create-form">
+        <label for="g-name">Group name</label><input id="g-name" required>
+        <div class="row">
+          <div><label for="g-chair">Chair's name</label><input id="g-chair" required></div>
+          <div><label for="g-phone">Chair's phone</label><input id="g-phone" type="tel" required></div>
+        </div>
+        <label for="g-pin">Chair's PIN (4–6 digits)</label><input id="g-pin" type="password" inputmode="numeric" required>
+        <div class="row">
+          <div><label for="g-rate">Loan interest per month (%)</label><input id="g-rate" type="number" step="0.1" value="10" min="0" max="50"></div>
+          <div><label for="g-mult">Loan limit (× savings)</label><input id="g-mult" type="number" value="3" min="1" max="10"></div>
+        </div>
+        <button type="submit">Create group</button>
+      </form>
+    </details>
+  </section>
+
+  <section id="app" hidden>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <div><b id="group-name"></b> <span class="muted" id="group-no"></span><br><span class="muted" id="whoami"></span></div>
+        <button class="link" id="logout">Log out</button>
+      </div>
+      <p id="verify-badge" style="margin:8px 0 0"></p>
+    </div>
+    <nav id="tabs">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="mine">My statement</button>
+      <button data-tab="ledger">Ledger</button>
+      <button data-tab="members">Members</button>
+      <button data-tab="record" data-official>Record</button>
+      <button data-tab="meetings">Meetings</button>
+      <button data-tab="shareout">Share-out</button>
+    </nav>
+
+    <div class="tab card" id="tab-overview"><div class="grid" id="stats"></div></div>
+
+    <div class="tab card" id="tab-mine" hidden>
+      <div class="grid" id="my-stats"></div>
+      <p id="my-pending" class="warn"></p>
+      <div class="scroll"><table id="my-lines"></table></div>
+      <div id="my-loans"></div>
+    </div>
+
+    <div class="tab card" id="tab-ledger" hidden>
+      <p class="muted">Each entry's fingerprint is part of a chain: changing any past entry breaks every fingerprint after it.</p>
+      <div class="scroll"><table id="ledger"></table></div>
+      <button class="link" id="download">Download ledger (JSON) to verify yourself</button>
+    </div>
+
+    <div class="tab card" id="tab-members" hidden>
+      <div class="scroll"><table id="members"></table></div>
+      <details data-official><summary><b>Add a member</b></summary>
+        <form id="member-form">
+          <div class="row">
+            <div><label for="m-name">Name</label><input id="m-name" required></div>
+            <div><label for="m-phone">Phone</label><input id="m-phone" type="tel" required></div>
+          </div>
+          <div class="row">
+            <div><label for="m-pin">Starting PIN</label><input id="m-pin" inputmode="numeric" required></div>
+            <div><label for="m-role">Role</label>
+              <select id="m-role"><option>member</option><option>treasurer</option><option>secretary</option><option>chair</option></select></div>
+          </div>
+          <label for="m-lang">SMS language</label>
+          <select id="m-lang"><option value="en">English</option><option value="sw">Kiswahili</option></select>
+          <button type="submit">Add member</button>
+        </form>
+      </details>
+    </div>
+
+    <div class="tab card" id="tab-record" hidden>
+      <form id="entry-form">
+        <label for="e-kind">What happened?</label>
+        <select id="e-kind">
+          <option value="contribution">Savings contribution</option>
+          <option value="loan_repayment">Loan repayment</option>
+          <option value="fine">Fine</option>
+          <option value="welfare_contribution">Welfare contribution</option>
+          <option value="loan_disbursement">Loan issued (needs 2nd official)</option>
+          <option value="expense">Group expense (needs 2nd official)</option>
+          <option value="welfare_payout">Welfare payout (needs 2nd official)</option>
+        </select>
+        <div id="e-member-wrap"><label for="e-member">Member</label><select id="e-member"></select></div>
+        <div id="e-loan-wrap" hidden><label for="e-loan">Loan</label><select id="e-loan"></select></div>
+        <div class="row">
+          <div><label for="e-amount">Amount (KES)</label><input id="e-amount" inputmode="decimal" required></div>
+          <div id="e-months-wrap" hidden><label for="e-months">Months</label><input id="e-months" type="number" min="1" value="3"></div>
+        </div>
+        <div class="row">
+          <div><label for="e-ref">M-Pesa / receipt code</label><input id="e-ref" placeholder="optional"></div>
+          <div><label for="e-memo">Note</label><input id="e-memo" placeholder="required for fines and expenses"></div>
+        </div>
+        <fieldset id="e-approve" hidden class="card">
+          <legend>Second official approves</legend>
+          <div class="row">
+            <div><label for="e-ap-phone">Their phone</label><input id="e-ap-phone" type="tel"></div>
+            <div><label for="e-ap-pin">Their PIN</label><input id="e-ap-pin" type="password" inputmode="numeric"></div>
+          </div>
+        </fieldset>
+        <button type="submit">Record</button>
+      </form>
+    </div>
+
+    <div class="tab card" id="tab-meetings" hidden>
+      <form id="meeting-form" data-official>
+        <p class="muted">Closing a meeting texts every member their balance and the ledger fingerprint.</p>
+        <div class="row">
+          <div><label for="mt-cash">Cash counted (KES)</label><input id="mt-cash" inputmode="decimal" placeholder="optional"></div>
+          <div><label for="mt-note">Note</label><input id="mt-note"></div>
+        </div>
+        <button type="submit">Close meeting</button>
+      </form>
+      <div class="scroll"><table id="meetings"></table></div>
+    </div>
+
+    <div class="tab card" id="tab-shareout" hidden>
+      <div id="shareout"></div>
+      <form id="shareout-form" hidden>
+        <div class="row">
+          <div><label for="so-phone">Second official's phone</label><input id="so-phone" type="tel" required></div>
+          <div><label for="so-pin">Their PIN</label><input id="so-pin" type="password" inputmode="numeric" required></div>
+        </div>
+        <button type="submit">Pay out share-out</button>
+      </form>
+    </div>
+  </section>
+  <div id="toast" hidden role="status"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const KES = (c) => (c < 0 ? "-" : "") + "KES " + (Math.abs(c) / 100).toLocaleString("en-KE", { minimumFractionDigits: Math.abs(c) % 100 ? 2 : 0, maximumFractionDigits: 2 });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const LABELS = { contribution: "Savings", fine: "Fine", welfare_contribution: "Welfare", loan_disbursement: "Loan issued",
+  loan_repayment: "Loan repayment", expense: "Expense", welfare_payout: "Welfare payout", share_out: "Share-out", reversal: "Correction" };
+const NEEDS_APPROVAL = new Set(["loan_disbursement", "expense", "welfare_payout"]);
+let session = null, me = null, members = [];
+const isOfficial = () => me && ["chair", "treasurer", "secretary"].includes(me.role);
+
+function store(key, value) { try { value === null ? sessionStorage.removeItem(key) : sessionStorage.setItem(key, value); } catch (_) {} }
+function load(key) { try { return sessionStorage.getItem(key); } catch (_) { return null; } }
+
+function toast(msg) {
+  $("toast").textContent = msg; $("toast").hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => ($("toast").hidden = true), 6000);
+}
+
+async function api(path, opts = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (session) headers.Authorization = "Bearer " + session.token;
+  const resp = await fetch(path, { ...opts, headers, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  if (resp.status === 204) return null;
+  const data = await resp.json().catch(() => ({}));
+  if (resp.status === 401 && session && !path.endsWith("/login")) logout();
+  if (!resp.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Please check the form.");
+  return data;
+}
+const gpath = (p = "") => `groups/${session.group}${p}`;
+
+function startSession(group, token) {
+  session = { group, token };
+  store("chama-session", JSON.stringify(session));
+  $("auth").hidden = true; $("app").hidden = false;
+  loadOverview();
+}
+
+function logout() {
+  if (session) fetch(gpath("/logout"), { method: "POST", headers: { Authorization: "Bearer " + session.token } }).catch(() => {});
+  session = null; me = null; store("chama-session", null);
+  $("auth").hidden = false; $("app").hidden = true;
+}
+
+$("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const group = Number($("login-group").value);
+  try {
+    const data = await api(`groups/${group}/login`, { method: "POST", body: { phone: $("login-phone").value, pin: $("login-pin").value } });
+    $("login-pin").value = "";
+    startSession(group, data.token);
+  } catch (err) { toast(err.message); }
+});
+
+$("create-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const data = await api("groups", { method: "POST", body: {
+      name: $("g-name").value, chair_name: $("g-chair").value, chair_phone: $("g-phone").value, chair_pin: $("g-pin").value,
+      loan_rate_bp: Math.round(Number($("g-rate").value) * 100), loan_multiplier: Number($("g-mult").value),
+    } });
+    toast(`Group created. Your group number is ${data.group.id}; members need it to log in.`);
+    startSession(data.group.id, data.token);
+  } catch (err) { toast(err.message); }
+});
+
+$("logout").addEventListener("click", logout);
+
+const LOADERS = { overview: () => loadOverview(), mine: () => loadMine(), ledger: () => loadLedger(), members: () => loadMembers(),
+  record: () => loadMembers(), meetings: () => loadMeetings(), shareout: () => loadShareout() };
+document.querySelectorAll("#tabs button").forEach((btn) => btn.addEventListener("click", () => {
+  document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+  document.querySelectorAll(".tab").forEach((tab) => (tab.hidden = tab.id !== "tab-" + btn.dataset.tab));
+  LOADERS[btn.dataset.tab]();
+}));
+
+const stat = (label, value, cls = "") => `<div class="stat"><span class="muted">${esc(label)}</span><b class="${cls}">${esc(value)}</b></div>`;
+
+async function loadOverview() {
+  try {
+    const data = await api(gpath());
+    me = data.me;
+    document.querySelectorAll("[data-official]").forEach((el) => (el.hidden = !isOfficial()));
+    $("group-name").textContent = data.group.name;
+    $("group-no").textContent = `· group #${data.group.id}`;
+    $("whoami").textContent = `${me.name} (${me.role})`;
+    const v = data.verification;
+    $("verify-badge").innerHTML = v.ok
+      ? `<span class="ok">✓ Ledger verified</span> <span class="muted">${v.entries_checked} entries, current fingerprint <code>${esc(v.fingerprint)}</code>, ${v.checkpoints_matched} meeting fingerprint(s) match</span>`
+      : `<span class="bad">✗ Ledger FAILED verification at entry #${esc(v.broken_at)}: ${esc(v.reason)}</span>`;
+    const s = data.summary;
+    $("stats").innerHTML = [
+      stat("Total savings", KES(s.total_savings)), stat("Cash expected", KES(s.cash_expected)),
+      stat("Loans outstanding", KES(s.loans_outstanding)), stat("Active loans", `${s.active_loans} (${s.overdue_loans} overdue)`, s.overdue_loans ? "warn" : ""),
+      stat("Welfare fund", KES(s.welfare_fund)), stat("Interest earned", KES(s.interest_income)),
+      stat("Fines", KES(s.fine_income)), stat("Expenses", KES(s.expenses)),
+      stat("Profit to share", KES(s.distributable_profit)), stat("Open disputes", data.open_disputes, data.open_disputes ? "bad" : ""),
+    ].join("");
+  } catch (err) { toast(err.message); }
+}
+
+async function loadMine() {
+  try {
+    const st = await api(gpath(`/statements/${me.id}`));
+    $("my-stats").innerHTML = [stat("My savings", KES(st.savings)), stat("My loan balance", KES(st.loan_balance)),
+      stat("Fines paid", KES(st.fines)), stat("Welfare paid", KES(st.welfare))].join("");
+    const pending = new Set(st.pending_acknowledgement);
+    $("my-pending").textContent = pending.size ? `${pending.size} entr${pending.size === 1 ? "y" : "ies"} waiting for you to confirm or dispute.` : "";
+    $("my-lines").innerHTML = "<tr><th>#</th><th>Date</th><th>What</th><th class=num>In</th><th class=num>Out</th><th class=num>Savings</th><th class=num>Loan</th><th></th></tr>" +
+      st.lines.map((l) => `<tr class="${l.reversed ? "struck" : ""}"><td>${l.seq}</td><td>${l.date}</td>
+        <td>${esc(LABELS[l.kind])}${l.reverses ? ` of #${l.reverses}` : ""}<br><span class="muted">${esc(l.memo)} ${esc(l.external_ref)} <code>${l.fingerprint}</code></span></td>
+        <td class=num>${l.paid_in ? KES(l.paid_in) : ""}</td><td class=num>${l.paid_out ? KES(l.paid_out) : ""}</td>
+        <td class=num>${KES(l.savings_balance)}</td><td class=num>${KES(l.loan_balance)}</td>
+        <td>${pending.has(l.seq) ? `<button class="link" data-ack="${l.seq}" data-status="confirmed">Correct</button> <button class="link" data-ack="${l.seq}" data-status="disputed">Wrong</button>` : ""}</td></tr>`).join("");
+    $("my-loans").innerHTML = st.loans.map((loan) => `<p><b>Loan #${loan.id}</b>: ${KES(loan.principal)} + ${KES(loan.interest)} interest,
+      paid ${KES(loan.paid)}, outstanding <b>${KES(loan.outstanding)}</b>, monthly ${KES(loan.installment)},
+      due ${loan.due_on} — <span class="${loan.status === "current" || loan.status === "cleared" ? "ok" : "warn"}">${loan.status.replace("_", " ")}</span>
+      ${loan.arrears ? `(arrears ${KES(loan.arrears)})` : ""}</p>`).join("");
+  } catch (err) { toast(err.message); }
+}
+
+$("my-lines").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-ack]");
+  if (!btn) return;
+  let note = "";
+  if (btn.dataset.status === "disputed") {
+    note = prompt("What is wrong with this entry?") || "";
+    if (!note.trim()) return;
+  }
+  try {
+    await api(gpath(`/entries/${btn.dataset.ack}/acknowledge`), { method: "POST", body: { status: btn.dataset.status, note } });
+    toast(btn.dataset.status === "confirmed" ? "Thank you for confirming." : "Dispute recorded; the whole group can see it.");
+    loadMine(); loadOverview();
+  } catch (err) { toast(err.message); }
+});
+
+async function loadLedger() {
+  try {
+    const entries = await api(gpath("/ledger"));
+    $("ledger").innerHTML = "<tr><th>#</th><th>When</th><th>What</th><th class=num>Amount</th><th>Recorded / approved</th><th>Fingerprint</th></tr>" +
+      entries.slice().reverse().map((e) => {
+        const ack = e.acknowledgement;
+        const ackText = ack ? (ack.status === "confirmed" ? `<span class="ok">✓ confirmed</span>` : `<span class="bad">disputed: ${esc(ack.note)}</span>`) : "";
+        const canReverse = isOfficial() && e.kind !== "reversal" && !e.reversed;
+        return `<tr class="${e.reversed ? "struck" : ""}"><td>${e.seq}</td><td>${e.recorded_at.slice(0, 10)}</td>
+          <td>${esc(LABELS[e.kind])}${e.data.reverses ? ` of #${e.data.reverses}` : ""}${e.member_name ? ` · ${esc(e.member_name)}` : ""}
+            <br><span class="muted">${esc(e.memo)} ${esc(e.external_ref)}</span> ${ackText}
+            ${canReverse ? `<button class="link" data-reverse="${e.seq}">Reverse</button>` : ""}</td>
+          <td class=num>${KES(e.amount)}</td>
+          <td>${esc(e.recorded_by_name)}${e.approved_by_name ? ` / ${esc(e.approved_by_name)}` : ""}</td>
+          <td><code>${e.fingerprint}</code></td></tr>`;
+      }).join("");
+  } catch (err) { toast(err.message); }
+}
+
+$("ledger").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-reverse]");
+  if (!btn) return;
+  const reason = prompt(`Why reverse entry #${btn.dataset.reverse}? Everyone will see this.`);
+  if (!reason) return;
+  const approverPhone = prompt("Second official's phone:");
+  const approverPin = approverPhone && prompt("Second official's PIN:");
+  if (!approverPin) return;
+  try {
+    await api(gpath(`/entries/${btn.dataset.reverse}/reverse`), { method: "POST",
+      body: { reason, approver_phone: approverPhone, approver_pin: approverPin } });
+    toast("Reversal recorded."); loadLedger(); loadOverview();
+  } catch (err) { toast(err.message); }
+});
+
+$("download").addEventListener("click", async () => {
+  try {
+    const data = await api(gpath("/export"));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: `chama-${session.group}-ledger.json` });
+    a.click(); URL.revokeObjectURL(url);
+    toast("Verify it with: python -m chama verify <file> --fingerprint <from your SMS> --at <entry>");
+  } catch (err) { toast(err.message); }
+});
+
+async function loadMembers() {
+  try {
+    members = await api(gpath("/members"));
+    $("members").innerHTML = "<tr><th>Name</th><th>Role</th><th>Phone</th><th class=num>Savings</th><th class=num>Loan</th><th class=num>Loan limit</th></tr>" +
+      members.map((m) => `<tr><td>${esc(m.name)}</td><td>${esc(m.role)}</td><td>${esc(m.phone)}</td>
+        <td class=num>${KES(m.savings)}</td><td class=num>${KES(m.loan_balance)}</td><td class=num>${KES(m.loan_limit)}</td></tr>`).join("");
+    $("e-member").replaceChildren(...members.filter((m) => m.active).map((m) => new Option(m.name, m.id)));
+    const borrowers = members.filter((m) => m.loan_balance > 0);
+    const options = [];
+    for (const m of borrowers) {
+      const st = await api(gpath(`/statements/${m.id}`));
+      for (const loan of st.loans.filter((l) => l.outstanding > 0)) {
+        options.push(new Option(`#${loan.id} ${m.name} (owes ${KES(loan.outstanding)})`, loan.id));
+      }
+    }
+    $("e-loan").replaceChildren(...options);
+  } catch (err) { toast(err.message); }
+}
+
+$("member-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    await api(gpath("/members"), { method: "POST", body: { name: $("m-name").value, phone: $("m-phone").value,
+      pin: $("m-pin").value, role: $("m-role").value, language: $("m-lang").value } });
+    e.target.reset(); toast("Member added. Share the group number and their PIN with them."); loadMembers();
+  } catch (err) { toast(err.message); }
+});
+
+function syncEntryForm() {
+  const kind = $("e-kind").value;
+  $("e-member-wrap").hidden = kind === "expense" || kind === "loan_repayment";
+  $("e-loan-wrap").hidden = kind !== "loan_repayment";
+  $("e-months-wrap").hidden = kind !== "loan_disbursement";
+  $("e-approve").hidden = !NEEDS_APPROVAL.has(kind);
+}
+$("e-kind").addEventListener("change", syncEntryForm);
+
+$("entry-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const kind = $("e-kind").value;
+  const body = { kind, amount: $("e-amount").value, memo: $("e-memo").value, external_ref: $("e-ref").value };
+  if (!$("e-member-wrap").hidden) body.member_id = Number($("e-member").value);
+  if (kind === "loan_repayment") body.loan_id = Number($("e-loan").value);
+  if (kind === "loan_disbursement") body.months = Number($("e-months").value);
+  if (NEEDS_APPROVAL.has(kind)) { body.approver_phone = $("e-ap-phone").value; body.approver_pin = $("e-ap-pin").value; }
+  try {
+    const entry = await api(gpath("/entries"), { method: "POST", body });
+    toast(`Recorded as entry #${entry.seq} (${entry.fingerprint}).${entry.member_id ? " The member has been sent a receipt." : ""}`);
+    $("e-amount").value = $("e-ref").value = $("e-memo").value = $("e-ap-pin").value = "";
+    loadOverview(); loadMembers();
+  } catch (err) { toast(err.message); }
+});
+
+async function loadMeetings() {
+  try {
+    const list = await api(gpath("/meetings"));
+    $("meetings").innerHTML = "<tr><th>Closed</th><th>By</th><th>Up to entry</th><th>Fingerprint</th><th class=num>Cash expected</th><th class=num>Counted</th></tr>" +
+      list.slice().reverse().map((m) => {
+        const diff = m.counted_cash === null ? 0 : m.counted_cash - m.expected_cash;
+        return `<tr><td>${m.closed_at.slice(0, 16).replace("T", " ")}</td><td>${esc(m.closed_by)}</td><td>#${m.seq}</td>
+          <td><code>${m.fingerprint}</code></td><td class=num>${KES(m.expected_cash)}</td>
+          <td class="num ${diff ? "bad" : ""}">${m.counted_cash === null ? "—" : KES(m.counted_cash)}${diff ? ` (${diff > 0 ? "+" : ""}${KES(diff)})` : ""}</td></tr>`;
+      }).join("");
+  } catch (err) { toast(err.message); }
+}
+
+$("meeting-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api(gpath("/meetings/close"), { method: "POST", body: { counted_cash: $("mt-cash").value || null, note: $("mt-note").value } });
+    toast(`Meeting closed at #${r.seq}, fingerprint ${r.fingerprint}. ${r.sms_sent} SMS sent.`);
+    e.target.reset(); loadMeetings(); loadOverview();
+  } catch (err) { toast(err.message); }
+});
+
+async function loadShareout() {
+  try {
+    const plan = await api(gpath("/share-out"));
+    if (!members.length) members = await api(gpath("/members"));
+    const names = Object.fromEntries(members.map((m) => [m.id, m.name]));
+    $("shareout").innerHTML = `<p>Profit to share: <b>${KES(plan.profit)}</b> · welfare fund kept: ${KES(plan.welfare_fund_kept)}</p>
+      <div class="scroll"><table><tr><th>Member</th><th class=num>Savings</th><th class=num>Profit share</th><th class=num>Total</th></tr>
+      ${plan.lines.map((l) => `<tr><td>${esc(names[l.member_id])}</td><td class=num>${KES(l.savings)}</td><td class=num>${KES(l.profit_share)}</td><td class=num><b>${KES(l.savings + l.profit_share)}</b></td></tr>`).join("")}
+      </table></div><p class="muted">Total payout ${KES(plan.total_payout)}</p>`;
+    $("shareout-form").hidden = !isOfficial();
+  } catch (err) {
+    $("shareout").innerHTML = `<p class="muted">Share-out not available yet: ${esc(err.message)}</p>`;
+    $("shareout-form").hidden = true;
+  }
+}
+
+$("shareout-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!confirm("Pay out the share-out now? This records a payout for every member.")) return;
+  try {
+    await api(gpath("/share-out"), { method: "POST", body: { approver_phone: $("so-phone").value, approver_pin: $("so-pin").value } });
+    toast("Share-out recorded."); e.target.reset(); loadShareout(); loadOverview();
+  } catch (err) { toast(err.message); }
+});
+
+syncEntryForm();
+try {
+  const saved = JSON.parse(load("chama-session") || "null");
+  if (saved && saved.token) startSession(saved.group, saved.token);
+} catch (_) {}
+</script>
+</body>
+</html>
